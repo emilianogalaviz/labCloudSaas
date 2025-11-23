@@ -12,7 +12,7 @@ resource "aws_db_instance" "main" {
   publicly_accessible  = false # ¡CRÍTICO! Nunca expongas la DB
 
   # REFERENCIA CRÍTICA: Esto fallará si Emiliano no ha fusionado el security.tf
-  vpc_security_group_ids = [aws_security_group.db_access.id]
+  vpc_security_group_ids = [aws_security_group.db.id]
 
   tags = {
     Name = "LabCloud-Postgres"
