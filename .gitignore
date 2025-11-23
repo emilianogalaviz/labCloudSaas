@@ -1,0 +1,30 @@
+# --- Terraform (CRÍTICO) ---
+# El directorio donde se bajan los plugins (pesado e innecesario)
+.terraform/
+
+# Archivos de Estado (NUNCA SUBIR: Contienen tus secretos y IDs reales)
+*.tfstate
+*.tfstate.*
+
+# Archivos de variables con claves (Si creas un terraform.tfvars, ignóralo)
+*.tfvars
+*.auto.tfvars
+
+# Logs de errores
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Configuración de CLI local
+.terraformrc
+terraform.rc
+
+# --- Sistema Operativo (Mac/Windows) ---
+.DS_Store
+Thumbs.db
+
+# --- IDEs (Configuraciones de tu editor) ---
+.vscode/
+.idea/
