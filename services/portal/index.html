@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>LabCloud Portal</title></head>
+<body>
+    <h1>Consulta de Resultados</h1>
+    <input type="text" id="patientId" placeholder="ID Paciente">
+    <button onclick="check()">Consultar</button>
+    <div id="result"></div>
+    <script>
+        async function check() {
+            // Jose debe poner aquí la URL REAL del API Gateway de Emiliano
+            const API_URL = "https://tsyj9bwol6.execute-api.us-east-2.amazonaws.com/ingest"; 
+            const id = document.getElementById('patientId').value;
+            // Nota: Esto es solo un ejemplo, idealmente habría un endpoint GET
+            document.getElementById('result').innerText = "Consultando...";
+        }
+    </script>
+</body>
+</html>
