@@ -2,7 +2,7 @@ resource "aws_db_instance" "main" {
   identifier           = "${var.project_name}-main-db"
   allocated_storage    = 20
   engine               = "postgres"
-  engine_version       = "15.2"
+  engine_version       = "16.6"
   instance_class       = "db.t3.micro" # MODO AHORRO (Gratuita elegible)
   db_name              = "labcloud"
   username             = var.db_username
