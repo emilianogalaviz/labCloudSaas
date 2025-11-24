@@ -40,3 +40,20 @@ resource "aws_ecs_task_definition" "processor" {
     }
   }])
 }
+# --- El Servicio (El que mantiene al worker vivo) ---
+resource "aws_ecs_service" "worker" {
+  name            = "labcloud-worker-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.processor.arn
+  desired_count   = 1 # Solo 1 para ahorrar dinero (Free Tier friendly-ish)
+  launch_type     = "FARGATE"
+
+  # Configuración de Red (¡CRÍTICO!)
+  # Lo ponemos en la red privada para que nadie de internet lo toque directo
+  # Pero usará el NAT Gateway que creó Emiliano para salir a buscar trabajos a SQS
+  network_configuration {
+    subnets          = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+    security_groups  = [aws_security_group.app.id] # Reusamos el SG de la App
+    assign_public_ip = false
+  }
+}
