@@ -16,7 +16,7 @@ variable "vpc_cidr" {
 variable "db_username" {
   description = "Usuario maestro de la base de datos PostgreSQL"
   type        = string
-  default     = "admin" # El nombre de usuario puede ser público
+  default     = "dbadmin" # El nombre de usuario puede ser público
 }
 
 variable "db_password" {
