@@ -26,7 +26,7 @@ resource "aws_lambda_function" "ingest" {
 resource "aws_apigatewayv2_api" "main" {
   name          = "labcloud-api"
   protocol_type = "HTTP"
-  
+
   # Configuración CORS (Para que funcione desde el navegador)
   cors_configuration {
     allow_origins = ["*"]

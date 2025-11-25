@@ -13,7 +13,7 @@ resource "aws_cognito_user_pool" "main" {
 
   # Atributos estándar requeridos
   auto_verified_attributes = ["email"]
-  
+
   # ATRIBUTO PERSONALIZADO PARA MULTI-TENANCY (CRÍTICO)
   schema {
     name                     = "tenant_id"
@@ -37,10 +37,10 @@ resource "aws_cognito_user_pool_client" "client" {
   name = "${var.project_name}-app-client"
 
   user_pool_id = aws_cognito_user_pool.main.id
-  
+
   # No generamos secreto porque es para una App Web (Javascript)
   generate_secret = false
-  
+
   explicit_auth_flows = [
     "ALLOW_USER_PASSWORD_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",

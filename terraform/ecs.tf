@@ -21,13 +21,13 @@ resource "aws_ecs_task_definition" "processor" {
     name      = "processor"
     image     = "${aws_ecr_repository.main.repository_url}:latest" # Apunta al repo creado en ecr.tf
     essential = true
-    
+
     # Variables de entorno para que el código sepa dónde conectarse
     # (Estas referencias funcionarán porque Emiliano ya creó la DB)
     environment = [
       { name = "DB_HOST", value = replace(aws_db_instance.main.endpoint, ":5432", "") },
       { name = "DB_NAME", value = "labcloud" },
-      { name = "REGION",  value = var.aws_region }
+      { name = "REGION", value = var.aws_region }
     ]
 
     logConfiguration = {
@@ -75,11 +75,11 @@ resource "aws_ecs_task_definition" "portal" {
   execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([{
-    name  = "portal"
+    name = "portal"
     # OJO: Aquí referenciamos el repositorio NUEVO que creamos arriba
-    image = "${aws_ecr_repository.portal.repository_url}:latest"
+    image     = "${aws_ecr_repository.portal.repository_url}:latest"
     essential = true
-    
+
     # Esto es vital: Abrir el puerto 80 para que entre tráfico web
     portMappings = [{
       containerPort = 80
@@ -108,11 +108,11 @@ resource "aws_ecs_service" "portal" {
   # CONFIGURACIÓN DE RED (Diferente al Worker)
   network_configuration {
     # IMPORTANTE: Usamos subredes PÚBLICAS porque queremos que internet lo vea
-    subnets          = [aws_subnet.public_1.id, aws_subnet.public_2.id]
-    
+    subnets = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+
     # Reusamos el Security Group de la App (que permite puerto 80)
-    security_groups  = [aws_security_group.app.id] 
-    
+    security_groups = [aws_security_group.app.id]
+
     # CRÍTICO: Le asignamos IP pública para poder entrar desde Chrome
     assign_public_ip = true
   }
