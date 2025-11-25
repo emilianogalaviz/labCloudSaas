@@ -1,9 +1,9 @@
 # 1. La Tabla de Facturación (NoSQL)
 resource "aws_dynamodb_table" "billing" {
-  name           = "labcloud-billing-usage"
-  billing_mode   = "PAY_PER_REQUEST" # Importante: Capa gratuita amigable
-  hash_key       = "tenant_id"       # Clave principal (Quién paga)
-  range_key      = "month"           # Clave de ordenamiento (Cuándo)
+  name         = "labcloud-billing-usage"
+  billing_mode = "PAY_PER_REQUEST" # Importante: Capa gratuita amigable
+  hash_key     = "tenant_id"       # Clave principal (Quién paga)
+  range_key    = "month"           # Clave de ordenamiento (Cuándo)
 
   attribute {
     name = "tenant_id"
