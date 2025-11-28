@@ -33,9 +33,11 @@ resource "aws_iam_role_policy" "lambda_sqs" {
   })
 }
 
-# Permiso para que la Lambda pueda crear usuarios en Cognito
+# --- AÑADE ESTO DESPUÉS DEL BLOQUE SQS ---
+
+# Permiso para que la Lambda pueda crear usuarios en Cognito (Tu nuevo código)
 resource "aws_iam_role_policy" "lambda_cognito_policy" {
-  name = "labcloud-lambda-cognito-admin"
+  name = "labcloud-cognito-admin"
   role = aws_iam_role.lambda_exec.id
 
   policy = jsonencode({
@@ -46,7 +48,13 @@ resource "aws_iam_role_policy" "lambda_cognito_policy" {
         "cognito-idp:AdminCreateUser",
         "cognito-idp:AdminSetUserPassword"
       ]
-      Resource = "*" # En prod deberías poner el ARN específico del Pool
+      Resource = "*" # En prod deberias poner el ARN especifico del Pool
     }]
   })
+}
+
+# Permiso NUEVO para que la Lambda pueda entrar a la VPC (El arreglo que falló)
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
