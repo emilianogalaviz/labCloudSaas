@@ -1,3 +1,4 @@
+# FORCE UPDATE: VERSION FINAL CON PROTECCION NULL
 import json
 import boto3
 import os
@@ -20,15 +21,12 @@ def get_db_connection():
     return psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
 
 def search_results(tenant_id, search_term):
-    """Busca en el esquema privado del tenant"""
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 1. Seguridad: Entrar al cuarto del tenant
             cur.execute(f"SET search_path TO {tenant_id};")
             
-            # 2. Buscar
             if search_term:
                 query = "SELECT patient_id, data, created_at FROM results WHERE patient_id LIKE %s LIMIT 10;"
                 cur.execute(query, (f'%{search_term}%',))
@@ -37,21 +35,21 @@ def search_results(tenant_id, search_term):
                 cur.execute(query)
             
             rows = cur.fetchall()
-            
-            # Formatear respuesta (CON PROTECCIÓN CONTRA NULLS)
             results = []
             for row in rows:
-                # row[0]=patient_id, row[1]=data, row[2]=created_at
-                
-                # Validación de seguridad: Si data es None, poner default
+                # row[1] es la columna 'data'
                 raw_data = row[1]
-                if raw_data:
+                
+                # --- PROTECCIÓN CONTRA NULOS ---
+                if raw_data: 
                     try:
                         parsed_data = json.loads(raw_data)
                     except:
                         parsed_data = {"test": "Error", "result": "Datos corruptos"}
                 else:
-                    parsed_data = {"test": "Desconocido", "result": "Sin datos"}
+                    # SI ES NONE, ENTRA AQUÍ Y EVITA EL ERROR
+                    parsed_data = {"test": "Pendiente", "result": "Procesando..."}
+                # -------------------------------
 
                 results.append({
                     "patient_id": row[0] or "Anónimo",
@@ -61,7 +59,7 @@ def search_results(tenant_id, search_term):
             return results
     except Exception as e:
         print(f"Error DB: {str(e)}")
-        return [] # Retorna lista vacía en lugar de explotar
+        return [] 
     finally:
         if conn: conn.close()
 
@@ -77,38 +75,28 @@ def record_usage(tenant_id):
 
 def handler(event, context):
     try:
-        # Detectar si es una BÚSQUEDA (GET) o un INGRESO (POST)
         http_method = event.get('requestContext', {}).get('http', {}).get('method')
         
-        # --- LÓGICA DE BÚSQUEDA (GET) ---
+        # GET (BUSCAR)
         if http_method == 'GET':
             params = event.get('queryStringParameters', {})
             tenant_id = params.get('tenant_id')
             query = params.get('q', '')
-            
             if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
-            
             data = search_results(tenant_id, query)
-            return {
-                "statusCode": 200, 
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps(data)
-            }
+            return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps(data)}
 
-        # --- LÓGICA DE INGRESO (POST) ---
-        # (Tu código anterior)
-        body = json.loads(event.get('body', '{}'))
+        # POST (GUARDAR)
+        if 'body' in event: body = json.loads(event['body'])
+        else: body = event
+        
         tenant_id = body.get('tenant_id')
         if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
         
         record_usage(tenant_id)
         sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(body))
         
-        return {
-            "statusCode": 200, 
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Enviado a procesar"})
-        }
+        return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps({"message": "Enviado"})}
 
     except Exception as e:
         return {"statusCode": 500, "body": str(e)}
