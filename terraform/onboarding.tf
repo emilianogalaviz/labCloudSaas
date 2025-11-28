@@ -15,6 +15,11 @@ resource "aws_lambda_function" "onboarding" {
   source_code_hash = data.archive_file.onboarding_zip.output_base64sha256
   timeout          = 15
 
+  layers = [
+    # ARN de la librería psycopg2 precompilada para us-east-2 (Python 3.9)
+    "arn:aws:lambda:us-east-2:770693421113:layer:Klayers-p39-psycopg2-binary:1"
+  ]
+
   # IMPORTANTE: Conectar a la VPC para alcanzar la Base de Datos
   vpc_config {
     subnet_ids         = [aws_subnet.private_1.id, aws_subnet.private_2.id]
