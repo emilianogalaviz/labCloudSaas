@@ -3,31 +3,32 @@
 ## 1. Visión General
 LabCloud es una plataforma SaaS diseñada para laboratorios médicos que permite la gestión aislada de resultados de pacientes. La arquitectura sigue el modelo **Multi-Tenant** con aislamiento físico a nivel de esquema de base de datos (Schema-per-Tenant), garantizando que los datos de un laboratorio sean inaccesibles para otros.
 
-## 2. Diagrama de Arquitectura (Alto Nivel)
+## 2. Diagrama de Arquitectura
 
 ```mermaid
 graph TD
     User([Cliente / Laboratorio]) -->|HTTPS| APIGW[API Gateway]
-    User -->|HTTPS| Portal[Portal Web (ECS Fargate)]
+    User -->|HTTPS| Portal["Portal Web (ECS Fargate)"]
     
     subgraph "Capa de Ingesta & Auth"
-        APIGW -->|/register| LambdaOnboard[Lambda: Onboarding]
-        APIGW -->|/ingest| LambdaIngest[Lambda: Ingesta]
-        Portal -->|Auth| Cognito[AWS Cognito]
+        APIGW -->|/register| LambdaOnboard["Lambda: Onboarding"]
+        APIGW -->|/ingest| LambdaIngest["Lambda: Ingesta"]
+        Portal -->|Auth| Cognito["AWS Cognito"]
     end
     
     subgraph "Capa de Procesamiento Async"
-        LambdaIngest -->|Billing +1| DDB[DynamoDB: Billing]
-        LambdaIngest -->|JSON| SQS[Amazon SQS]
-        SQS -->|Pull| Worker[ECS Fargate: Worker]
+        LambdaIngest -->|"Billing +1"| DDB["DynamoDB: Billing"]
+        LambdaIngest -->|JSON| SQS["Amazon SQS"]
+        SQS -->|Pull| Worker["ECS Fargate: Worker"]
     end
     
     subgraph "Capa de Datos Aislada"
-        LambdaOnboard -->|Create Schema| RDS[(RDS PostgreSQL)]
-        Worker -->|SET search_path| RDS
-        Portal -->|Read Data| RDS
+        LambdaOnboard -->|"Create Schema"| RDS[("RDS PostgreSQL")]
+        Worker -->|"SET search_path"| RDS
+        Portal -->|"Read Data"| RDS
     end
 ```
+
 
 ## 3. Componentes Principales
 
@@ -81,30 +82,3 @@ graph TD
 * **VPC:** Toda la computación ocurre dentro de una VPC privada.
 * **Security Groups:** La Base de Datos RDS **no tiene acceso público**. Solo acepta conexiones desde el Security Group de la Aplicación (Lambda/ECS).
 * **Encriptación:** Datos en reposo encriptados en RDS y S3.
-
-graph TD
-    Client["Laboratory Client"] -->|HTTPS POST| APIGW["API Gateway"]
-    
-    subgraph Public ["Public Zone"]
-        APIGW
-        Portal["Patient Portal (ECS Fargate)"]
-    end
-
-    subgraph Ingestion ["Ingestion Layer (Serverless)"]
-        APIGW -->|Trigger| IngestLambda["Lambda Ingest"]
-        APIGW -->|Trigger| OnboardLambda["Lambda Onboarding"]
-        IngestLambda -->|Write Usage| DynamoDB[("DynamoDB Billing")]
-        IngestLambda -->|Queue Data| SQS["SQS Queue"]
-    end
-
-    subgraph Private ["Private Processing Layer (VPC)"]
-        SQS -->|Pull| Worker["ECS Worker (Python)"]
-        Worker -->|Store Data| RDS[("RDS PostgreSQL")]
-        OnboardLambda -->|Create Schema| RDS
-    end
-
-    subgraph Security ["Security & Management"]
-        Cognito["Amazon Cognito"] -->|Auth| Portal
-        ECR["ECR Registry"] -->|Docker Images| Worker
-        ECR -->|Docker Images| Portal
-    end
