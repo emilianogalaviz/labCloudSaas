@@ -25,10 +25,11 @@ resource "aws_lambda_function" "onboarding" {
   # Pasar las credenciales de la BD
   environment {
     variables = {
-      DB_HOST = replace(aws_db_instance.main.endpoint, ":5432", "")
-      DB_NAME = "labcloud"
-      DB_USER = aws_db_instance.main.username # Ojo: Asegúrate que coincida
-      DB_PASS = var.db_password
+      DB_HOST      = replace(aws_db_instance.main.endpoint, ":5432", "")
+      DB_NAME      = "labcloud"
+      DB_USER      = aws_db_instance.main.username # Ojo: Asegúrate que coincida
+      DB_PASS      = var.db_password
+      USER_POOL_ID = aws_cognito_user_pool.main.id
     }
   }
 }

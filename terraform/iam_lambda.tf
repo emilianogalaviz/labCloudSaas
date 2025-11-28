@@ -33,7 +33,27 @@ resource "aws_iam_role_policy" "lambda_sqs" {
   })
 }
 
-# --- Permiso NUEVO para que la Lambda pueda entrar a la VPC ---
+# --- REEMPLAZA TODO EL BLOQUE DE CONFLICTO POR ESTO ---
+
+# Permiso para que la Lambda pueda crear usuarios en Cognito
+resource "aws_iam_role_policy" "lambda_cognito_policy" {
+  name = "labcloud-cognito-admin"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+# Permiso NUEVO para que la Lambda pueda entrar a la VPC
 resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
