@@ -3,67 +3,100 @@ import json
 import time
 import psycopg2
 import boto3
-from datetime import datetime
 
-# Configuraciones desde Variables de Entorno (que definimos en ecs.tf)
+# Configuración
 DB_HOST = os.environ.get('DB_HOST')
 DB_NAME = os.environ.get('DB_NAME', 'labcloud')
-DB_USER = os.environ.get('DB_USER', 'dbadmin') # O el usuario que pusiste en rds.tf
-DB_PASS = os.environ.get('DB_PASS', 'password123') # Ojo aquí, idealmente usar Secrets Manager
+DB_USER = os.environ.get('DB_USER', 'dbadmin') # Ojo con el usuario que definiste en terraform
+DB_PASS = os.environ.get('DB_PASS') # Idealmente usar secrets, por ahora env var
 REGION = os.environ.get('REGION', 'us-east-2')
 QUEUE_URL = os.environ.get('QUEUE_URL')
 
+# Cliente SQS para leer mensajes
 sqs = boto3.client('sqs', region_name=REGION)
 
-def connect_db():
+def get_db_connection():
     return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS
+        host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS
     )
 
-def process_message(message):
-    try:
-        body = json.loads(message['Body'])
-        print(f"Procesando resultado para paciente: {body.get('patient_id')}")
-        
-        # Lógica Multi-Tenant: Insertar en la tabla correcta
-        # Aquí iría tu lógica real de inserción en SQL
-        # conn = connect_db()
-        # ... hacer insert ...
-        # conn.close()
-        
-        return True
-    except Exception as e:
-        print(f"Error procesando mensaje: {str(e)}")
+def save_result(data):
+    """Guarda el resultado en el esquema aislado del tenant"""
+    tenant_id = data.get('tenant_id')
+    patient = data.get('patient_name')
+    test_type = data.get('test_type')
+    result_data = data.get('result_data')
+
+    if not tenant_id:
+        print("Error: Mensaje sin Tenant ID")
         return False
 
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 1. AISLAMIENTO: Cambiar al esquema del cliente
+            # Esto es lo que evita que Pepe vea los datos de Juan
+            cur.execute(f"SET search_path TO {tenant_id};")
+
+            # 2. Insertar datos
+            # Nota: La tabla 'results' se creó automáticamente cuando registraste el lab
+            sql = """
+                INSERT INTO results (patient_id, data, created_at)
+                VALUES (%s, %s, NOW());
+            """
+            # Guardamos el JSON completo del resultado en la columna 'data'
+            full_record = json.dumps({"test": test_type, "result": result_data})
+            cur.execute(sql, (patient, full_record))
+            
+            conn.commit()
+            print(f"✅ Guardado exitoso para: {tenant_id} - Paciente: {patient}")
+            return True
+
+    except Exception as e:
+        print(f"❌ Error guardando en DB: {str(e)}")
+        if conn: conn.rollback()
+        return False
+    finally:
+        if conn: conn.close()
+
 def main():
-    print("Iniciando Worker de LabCloud...")
+    print("👷 Worker iniciado. Esperando análisis médicos...")
+    
+    # Obtener URL de la cola dinámicamente si no está en env
+    q_url = QUEUE_URL
+    if not q_url:
+        response = sqs.get_queue_url(QueueName='labcloud-results-queue')
+        q_url = response['QueueUrl']
+
     while True:
         try:
-            # 1. Leer de SQS
+            # 1. Leer mensajes (Long Polling)
             response = sqs.receive_message(
-                QueueUrl=QUEUE_URL,
+                QueueUrl=q_url,
                 MaxNumberOfMessages=1,
                 WaitTimeSeconds=20
             )
-            
+
             if 'Messages' in response:
                 for msg in response['Messages']:
-                    success = process_message(msg)
+                    body = json.loads(msg['Body'])
+                    print(f"📨 Mensaje recibido: {body}")
+                    
+                    # 2. Procesar y Guardar
+                    success = save_result(body)
+                    
+                    # 3. Borrar de la cola si se guardó bien
                     if success:
-                        # 2. Borrar de SQS si se procesó bien
                         sqs.delete_message(
-                            QueueUrl=QUEUE_URL,
+                            QueueUrl=q_url,
                             ReceiptHandle=msg['ReceiptHandle']
                         )
             else:
-                print("No hay mensajes, esperando...")
-                
+                print("💤 Nada por hacer...")
+
         except Exception as e:
-            print(f"Error en el ciclo principal: {str(e)}")
+            print(f"Error en loop principal: {str(e)}")
             time.sleep(5)
 
 if __name__ == "__main__":

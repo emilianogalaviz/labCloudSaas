@@ -3,59 +3,54 @@ import boto3
 import os
 from datetime import datetime
 
-# Conectamos con DynamoDB
+# Recursos AWS
+sqs = boto3.client('sqs')
 dynamodb = boto3.resource('dynamodb')
+
+# Variables de Entorno
+QUEUE_URL = os.environ.get('SQS_QUEUE_URL')
 TABLE_NAME = 'labcloud-billing-usage'
 
 def record_usage(tenant_id):
-    """Incrementa el contador de uso para el laboratorio"""
-    table = dynamodb.Table(TABLE_NAME)
-    # Obtenemos el mes actual (ej: "2023-11")
-    current_month = datetime.now().strftime('%Y-%m')
-    
-    # Operación Atómica: Sumar +1 sin leer primero (rápido y seguro)
-    table.update_item(
-        Key={
-            'tenant_id': tenant_id,
-            'month': current_month
-        },
-        UpdateExpression="ADD request_count :inc",
-        ExpressionAttributeValues={
-            ':inc': 1
-        }
-    )
-    print(f"Cobro registrado para: {tenant_id}")
+    """Cobra 1 crédito al laboratorio"""
+    try:
+        table = dynamodb.Table(TABLE_NAME)
+        current_month = datetime.now().strftime('%Y-%m')
+        table.update_item(
+            Key={'tenant_id': tenant_id, 'month': current_month},
+            UpdateExpression="ADD request_count :inc",
+            ExpressionAttributeValues={':inc': 1}
+        )
+    except Exception as e:
+        print(f"Error billing: {str(e)}")
 
 def handler(event, context):
     try:
         print("Evento recibido:", event)
-        
-        # 1. Extraer datos
-        # Si viene desde API Gateway, el cuerpo puede venir como string
-        if 'body' in event:
-            body = json.loads(event['body'])
-        else:
-            body = event
-            
-        tenant_id = body.get('tenant_id', 'UNKNOWN_LAB')
-        
-        # 2. Registrar Facturación (Billing)
+        body = json.loads(event.get('body', '{}'))
+        tenant_id = body.get('tenant_id')
+
+        if not tenant_id:
+            return {"statusCode": 400, "body": "Falta tenant_id"}
+
+        # 1. Billing (Cobrar)
         record_usage(tenant_id)
-        
-        # 3. Responder
+
+        # 2. Enviar a la Cola SQS (Para que el Worker lo guarde en DB)
+        sqs.send_message(
+            QueueUrl=QUEUE_URL,
+            MessageBody=json.dumps(body) # Enviamos todo el paquete (paciente, resultados, etc)
+        )
+
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "message": "Datos recibidos y cobro registrado",
-                "tenant_id": tenant_id,
-                "status": "processing"
-            })
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*" # Importante para que el navegador no se queje
+            },
+            "body": json.dumps({"message": "Procesando y guardando datos..."})
         }
-        
+
     except Exception as e:
-        print(f"Error procesando: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
+        print(f"Error critico: {str(e)}")
+        return {"statusCode": 500, "body": str(e)}
