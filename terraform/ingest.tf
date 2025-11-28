@@ -4,6 +4,18 @@ data "archive_file" "ingest_zip" {
   output_path = "${path.module}/files/ingest.zip"
 }
 
+
+resource "aws_apigatewayv2_api" "main" {
+  name          = "labcloud-api"
+  protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["POST", "GET", "OPTIONS"]
+    allow_headers = ["content-type", "authorization"]
+  }
+}
+
 resource "aws_lambda_function" "ingest" {
   filename         = data.archive_file.ingest_zip.output_path
   function_name    = "labcloud-ingest"
