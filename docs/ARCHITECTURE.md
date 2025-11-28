@@ -81,3 +81,30 @@ graph TD
 * **VPC:** Toda la computación ocurre dentro de una VPC privada.
 * **Security Groups:** La Base de Datos RDS **no tiene acceso público**. Solo acepta conexiones desde el Security Group de la Aplicación (Lambda/ECS).
 * **Encriptación:** Datos en reposo encriptados en RDS y S3.
+
+graph TD
+    Client["Laboratory Client"] -->|HTTPS POST| APIGW["API Gateway"]
+    
+    subgraph Public ["Public Zone"]
+        APIGW
+        Portal["Patient Portal (ECS Fargate)"]
+    end
+
+    subgraph Ingestion ["Ingestion Layer (Serverless)"]
+        APIGW -->|Trigger| IngestLambda["Lambda Ingest"]
+        APIGW -->|Trigger| OnboardLambda["Lambda Onboarding"]
+        IngestLambda -->|Write Usage| DynamoDB[("DynamoDB Billing")]
+        IngestLambda -->|Queue Data| SQS["SQS Queue"]
+    end
+
+    subgraph Private ["Private Processing Layer (VPC)"]
+        SQS -->|Pull| Worker["ECS Worker (Python)"]
+        Worker -->|Store Data| RDS[("RDS PostgreSQL")]
+        OnboardLambda -->|Create Schema| RDS
+    end
+
+    subgraph Security ["Security & Management"]
+        Cognito["Amazon Cognito"] -->|Auth| Portal
+        ECR["ECR Registry"] -->|Docker Images| Worker
+        ECR -->|Docker Images| Portal
+    end
