@@ -27,39 +27,49 @@ def search_results(tenant_id, search_term):
         with conn.cursor() as cur:
             cur.execute(f"SET search_path TO {tenant_id};")
             
+            # --- FIX: NO SELECCIONAMOS patient_id PORQUE NO EXISTE ---
+            # Seleccionamos solo 'data' y 'created_at'. 
+            # El ID del paciente está DENTRO del JSON 'data'.
+            
             if search_term:
-                query = "SELECT patient_id, data, created_at FROM results WHERE patient_id LIKE %s LIMIT 10;"
+                # Buscamos dentro del texto del JSON (data) porque no hay columna patient_id
+                query = "SELECT data, created_at FROM results WHERE data::text LIKE %s LIMIT 10;"
                 cur.execute(query, (f'%{search_term}%',))
             else:
-                query = "SELECT patient_id, data, created_at FROM results ORDER BY created_at DESC LIMIT 10;"
+                query = "SELECT data, created_at FROM results ORDER BY created_at DESC LIMIT 10;"
                 cur.execute(query)
             
             rows = cur.fetchall()
             results = []
+            
             for row in rows:
-                # row[1] es la columna 'data'
-                raw_data = row[1]
+                # row[0] = data (JSON string), row[1] = created_at
+                raw_data = row[0]
+                created_at = str(row[1])
                 
-                # --- PROTECCIÓN CONTRA NULOS ---
-                if raw_data: 
-                    try:
-                        parsed_data = json.loads(raw_data)
-                    except:
-                        parsed_data = {"test": "Error", "result": "Datos corruptos"}
-                else:
-                    # SI ES NONE, ENTRA AQUÍ Y EVITA EL ERROR
-                    parsed_data = {"test": "Pendiente", "result": "Procesando..."}
-                # -------------------------------
+                patient_name = "Desconocido"
+                display_data = {}
 
+                if raw_data:
+                    try:
+                        parsed = json.loads(raw_data)
+                        # Intentamos sacar el nombre de varios lugares posibles del JSON
+                        patient_name = parsed.get('patient_name') or parsed.get('patient_id') or "Anónimo"
+                        display_data = parsed
+                    except:
+                        display_data = {"error": "Datos corruptos"}
+                
                 results.append({
-                    "patient_id": row[0] or "Anónimo",
-                    "data": parsed_data,
-                    "date": str(row[2])
+                    "patient_id": patient_name, # Mostramos el nombre extraído del JSON
+                    "data": display_data,
+                    "date": created_at
                 })
             return results
+
     except Exception as e:
         print(f"Error DB: {str(e)}")
-        return [] 
+        # Devolvemos error vacío para no romper el frontend
+        return []
     finally:
         if conn: conn.close()
 
@@ -83,6 +93,7 @@ def handler(event, context):
             tenant_id = params.get('tenant_id')
             query = params.get('q', '')
             if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
+            
             data = search_results(tenant_id, query)
             return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps(data)}
 
