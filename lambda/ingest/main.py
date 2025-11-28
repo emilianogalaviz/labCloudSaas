@@ -1,56 +1,104 @@
 import json
 import boto3
 import os
+import psycopg2
 from datetime import datetime
 
-# Recursos AWS
+# AWS Resources
 sqs = boto3.client('sqs')
 dynamodb = boto3.resource('dynamodb')
 
-# Variables de Entorno
+# Configuración
 QUEUE_URL = os.environ.get('SQS_QUEUE_URL')
 TABLE_NAME = 'labcloud-billing-usage'
+DB_HOST = os.environ.get('DB_HOST')
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASS = os.environ.get('DB_PASS')
+
+def get_db_connection():
+    return psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
+
+def search_results(tenant_id, search_term):
+    """Busca en el esquema privado del tenant"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 1. Seguridad: Entrar al cuarto del tenant
+            cur.execute(f"SET search_path TO {tenant_id};")
+            
+            # 2. Buscar
+            # Si search_term está vacío, trae los últimos 10. Si no, filtra.
+            if search_term:
+                query = "SELECT patient_id, data, created_at FROM results WHERE patient_id LIKE %s LIMIT 10;"
+                cur.execute(query, (f'%{search_term}%',))
+            else:
+                query = "SELECT patient_id, data, created_at FROM results ORDER BY created_at DESC LIMIT 10;"
+                cur.execute(query)
+            
+            rows = cur.fetchall()
+            
+            # Formatear respuesta
+            results = []
+            for row in rows:
+                # row[1] es el JSON del resultado guardado como texto
+                results.append({
+                    "patient_id": row[0],
+                    "data": json.loads(row[1]),
+                    "date": str(row[2])
+                })
+            return results
+    except Exception as e:
+        print(f"Error DB: {str(e)}")
+        return []
+    finally:
+        if conn: conn.close()
 
 def record_usage(tenant_id):
-    """Cobra 1 crédito al laboratorio"""
     try:
         table = dynamodb.Table(TABLE_NAME)
         current_month = datetime.now().strftime('%Y-%m')
         table.update_item(
             Key={'tenant_id': tenant_id, 'month': current_month},
-            UpdateExpression="ADD request_count :inc",
-            ExpressionAttributeValues={':inc': 1}
+            UpdateExpression="ADD request_count :inc", ExpressionAttributeValues={':inc': 1}
         )
-    except Exception as e:
-        print(f"Error billing: {str(e)}")
+    except: pass
 
 def handler(event, context):
     try:
-        print("Evento recibido:", event)
+        # Detectar si es una BÚSQUEDA (GET) o un INGRESO (POST)
+        http_method = event.get('requestContext', {}).get('http', {}).get('method')
+        
+        # --- LÓGICA DE BÚSQUEDA (GET) ---
+        if http_method == 'GET':
+            params = event.get('queryStringParameters', {})
+            tenant_id = params.get('tenant_id')
+            query = params.get('q', '')
+            
+            if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
+            
+            data = search_results(tenant_id, query)
+            return {
+                "statusCode": 200, 
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(data)
+            }
+
+        # --- LÓGICA DE INGRESO (POST) ---
+        # (Tu código anterior)
         body = json.loads(event.get('body', '{}'))
         tenant_id = body.get('tenant_id')
-
-        if not tenant_id:
-            return {"statusCode": 400, "body": "Falta tenant_id"}
-
-        # 1. Billing (Cobrar)
+        if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
+        
         record_usage(tenant_id)
-
-        # 2. Enviar a la Cola SQS (Para que el Worker lo guarde en DB)
-        sqs.send_message(
-            QueueUrl=QUEUE_URL,
-            MessageBody=json.dumps(body) # Enviamos todo el paquete (paciente, resultados, etc)
-        )
-
+        sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(body))
+        
         return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*" # Importante para que el navegador no se queje
-            },
-            "body": json.dumps({"message": "Procesando y guardando datos..."})
+            "statusCode": 200, 
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"message": "Enviado a procesar"})
         }
 
     except Exception as e:
-        print(f"Error critico: {str(e)}")
         return {"statusCode": 500, "body": str(e)}

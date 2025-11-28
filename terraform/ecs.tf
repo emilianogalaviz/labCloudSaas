@@ -17,6 +17,8 @@ resource "aws_ecs_task_definition" "processor" {
 
   execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
 
+  task_role_arn = aws_iam_role.ecs_task_execution_role.arn
+
   container_definitions = jsonencode([{
     name      = "processor"
     image     = "${aws_ecr_repository.main.repository_url}:latest" # Apunta al repo creado en ecr.tf
