@@ -29,7 +29,6 @@ def search_results(tenant_id, search_term):
             cur.execute(f"SET search_path TO {tenant_id};")
             
             # 2. Buscar
-            # Si search_term está vacío, trae los últimos 10. Si no, filtra.
             if search_term:
                 query = "SELECT patient_id, data, created_at FROM results WHERE patient_id LIKE %s LIMIT 10;"
                 cur.execute(query, (f'%{search_term}%',))
@@ -39,19 +38,30 @@ def search_results(tenant_id, search_term):
             
             rows = cur.fetchall()
             
-            # Formatear respuesta
+            # Formatear respuesta (CON PROTECCIÓN CONTRA NULLS)
             results = []
             for row in rows:
-                # row[1] es el JSON del resultado guardado como texto
+                # row[0]=patient_id, row[1]=data, row[2]=created_at
+                
+                # Validación de seguridad: Si data es None, poner default
+                raw_data = row[1]
+                if raw_data:
+                    try:
+                        parsed_data = json.loads(raw_data)
+                    except:
+                        parsed_data = {"test": "Error", "result": "Datos corruptos"}
+                else:
+                    parsed_data = {"test": "Desconocido", "result": "Sin datos"}
+
                 results.append({
-                    "patient_id": row[0],
-                    "data": json.loads(row[1]),
+                    "patient_id": row[0] or "Anónimo",
+                    "data": parsed_data,
                     "date": str(row[2])
                 })
             return results
     except Exception as e:
         print(f"Error DB: {str(e)}")
-        return []
+        return [] # Retorna lista vacía en lugar de explotar
     finally:
         if conn: conn.close()
 
