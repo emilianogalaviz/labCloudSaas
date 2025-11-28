@@ -29,7 +29,9 @@ resource "aws_ecs_task_definition" "processor" {
     environment = [
       { name = "DB_HOST", value = replace(aws_db_instance.main.endpoint, ":5432", "") },
       { name = "DB_NAME", value = "labcloud" },
-      { name = "REGION", value = var.aws_region }
+      { name = "REGION", value = var.aws_region },
+      { name = "DB_USER", value = aws_db_instance.main.username },
+      { name = "DB_PASS", value = var.db_password }
     ]
 
     logConfiguration = {
