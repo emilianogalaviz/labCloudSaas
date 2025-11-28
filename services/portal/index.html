@@ -5,25 +5,39 @@
     <title>LabCloud SaaS - Gestión de Laboratorios</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; }
+        
+        /* LOGIN STYLES */
         .login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
         .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 350px; text-align: center; }
         input, select, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background-color: #0066cc; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         button:hover { background-color: #0052a3; }
+        
+        /* DASHBOARD STYLES */
         .dashboard-container { max-width: 1000px; margin: 0 auto; padding: 20px; display: none; }
         .navbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 30px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .lab-badge { background: #e3f2fd; color: #0d47a1; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; border: 1px solid #bbdefb; }
-        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .panel { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        
         h2 { margin-top: 0; color: #333; }
+        h3 { margin-top: 0; color: #0066cc; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         label { display: block; text-align: left; font-weight: bold; margin-top: 10px; color: #555; }
-        .success-msg { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; }
-        .error-msg { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; }
-    </style>
+        
+        .success-msg { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; font-size: 0.9em; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; font-size: 0.9em; }
 
+        /* Estilos de la tabla de resultados */
+        .results-box { background:#f9f9f9; padding:10px; border-radius:5px; border:1px solid #eee; min-height:200px; max-height:400px; overflow-y:auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        th { text-align: left; background: #e9ecef; padding: 8px; font-size: 0.85em; color: #666; }
+        td { border-bottom: 1px solid #ddd; padding: 8px; vertical-align: top; }
+        tr:last-child td { border-bottom: none; }
+    </style>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1363.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.3/dist/amazon-cognito-identity.min.js"></script>
-    </head>
+</head>
 <body>
 
     <div id="login-view" class="login-container">
@@ -40,7 +54,7 @@
     <div id="dashboard-view" class="dashboard-container">
         <div class="navbar">
             <div>
-                <h3 style="margin:0;">Panel de Administración</h3>
+                <h3 style="margin:0; border:none; padding:0; color:#333;">Panel de Administración</h3>
                 <small id="user-email-display" style="color:#666;">...</small>
             </div>
             <div style="text-align: right;">
@@ -51,30 +65,40 @@
 
         <div class="grid">
             <div class="panel">
-                <h3>Registrar Paciente</h3>
-                <p style="font-size:0.9em; color:#666;">Los datos se guardarán en tu esquema aislado.</p>
+                <h3>📝 Registrar Paciente</h3>
+                <p style="font-size:0.8em; color:#666;">Los datos se guardarán en tu esquema aislado.</p>
+                
                 <label>Nombre del Paciente:</label>
                 <input type="text" id="p_name" placeholder="Ej: Juan Pérez">
+                
                 <label>Tipo de Prueba:</label>
                 <select id="p_test">
                     <option value="Sanguínea">Análisis Sanguíneo</option>
                     <option value="COVID-19">Prueba COVID-19</option>
                     <option value="Orina">General de Orina</option>
+                    <option value="Genética">Perfil Genético</option>
                 </select>
+                
                 <label>Resultados (JSON/Texto):</label>
-                <textarea id="p_result" rows="3" placeholder='{"glucosa": 95}'></textarea>
-                <button onclick="registrarPaciente()" style="margin-top:15px;">Guardar en Base de Datos</button>
+                <textarea id="p_result" rows="3" placeholder='{"glucosa": 95, "colesterol": 180}'></textarea>
+                
+                <button onclick="registrarPaciente()" style="margin-top:15px;">Guardar Resultado</button>
                 <div id="api-msg" class="success-msg"></div>
             </div>
+
             <div class="panel">
-                <h3>Buscar en Base de Datos</h3>
+                <h3>🔍 Buscar Resultados</h3>
+                <p style="font-size:0.8em; color:#666;">Consulta el historial de tu laboratorio.</p>
+                
                 <div style="display:flex; gap:10px;">
-                    <input type="text" placeholder="ID o Nombre..." style="margin:0;">
-                    <button style="width:auto;">Buscar</button>
+                    <input type="text" id="search_q" placeholder="Nombre o ID..." style="margin:0;">
+                    <button style="width:auto;" onclick="buscarPacientes()">Buscar</button>
                 </div>
-                <br>
-                <div style="background:#f9f9f9; padding:15px; border-radius:5px; border:1px dashed #ccc; height:200px; color:#888; display:flex; align-items:center; justify-content:center;">
-                    Resultados del esquema <b id="schema-display" style="margin-left:5px;">...</b> aparecerán aquí.
+                
+                <div id="results-area" class="results-box">
+                    <p style="color:#888; text-align:center; padding-top: 80px;">
+                        Los resultados aparecerán aquí.
+                    </p>
                 </div>
             </div>
         </div>
@@ -82,7 +106,7 @@
 
     <script>
         // ==========================================
-        // ⚠️ PEGA TUS DATOS AQUÍ OTRA VEZ
+        // ⚠️ CONFIGURACIÓN (¡LLENA ESTO!)
         // ==========================================
         const API_URL = "https://msu80ions6.execute-api.us-east-2.amazonaws.com"; 
         const POOL_DATA = {
@@ -90,9 +114,13 @@
             ClientId: '2helbqvf2cl0fitme2sh7t2ugl' 
         };
 
+        // ==========================================
+        // LÓGICA DEL SISTEMA
+        // ==========================================
         var userPool = new AmazonCognitoIdentity.CognitoUserPool(POOL_DATA);
         var currentTenantId = null;
 
+        // 1. FUNCIÓN DE LOGIN
         function login() {
             var email = document.getElementById('email').value;
             var password = document.getElementById('password').value;
@@ -111,7 +139,7 @@
                     var emailUser = payload['email'];
                     
                     if(!currentTenantId) {
-                        alert("Error: Usuario sin Tenant ID.");
+                        alert("Error crítico: Este usuario no tiene un Tenant ID asignado.");
                         return;
                     }
                     loadDashboard(emailUser, currentTenantId);
@@ -122,8 +150,7 @@
                     errorDiv.style.display = 'block';
                 },
                 newPasswordRequired: function(userAttributes, requiredAttributes) {
-                    // Cognito a veces pide cambio de contraseña al primer login
-                    // Para esta demo, lo forzamos con la misma contraseña (truco rápido)
+                    // Auto-aceptar cambio de contraseña para demos
                     cognitoUser.completeNewPasswordChallenge(password, {}, {
                         onSuccess: function(result) { login(); },
                         onFailure: function(err) { alert("Error pass: " + err.message); }
@@ -132,19 +159,23 @@
             });
         }
 
+        // 2. CARGAR DASHBOARD
         function loadDashboard(email, tenantId) {
             document.getElementById('login-view').style.display = 'none';
             document.getElementById('dashboard-view').style.display = 'block';
+            
             document.getElementById('user-email-display').innerText = email;
             document.getElementById('tenant-badge').innerText = "🏢 " + tenantId.toUpperCase();
-            document.getElementById('schema-display').innerText = tenantId;
         }
 
+        // 3. REGISTRAR PACIENTE (POST)
         async function registrarPaciente() {
             const name = document.getElementById('p_name').value;
             const test = document.getElementById('p_test').value;
             const result = document.getElementById('p_result').value;
             const msgDiv = document.getElementById('api-msg');
+
+            if(!name) return alert("Escribe un nombre");
 
             msgDiv.style.display = 'block';
             msgDiv.style.background = "#e2e6ea";
@@ -163,12 +194,21 @@
                         timestamp: new Date().toISOString()
                     })
                 });
+
                 const data = await response.json();
+
                 if (response.ok) {
                     msgDiv.style.background = "#d4edda";
                     msgDiv.style.color = "#155724";
-                    msgDiv.innerText = "✅ Guardado en esquema: " + currentTenantId;
-                } else { throw new Error(data.body); }
+                    msgDiv.innerText = "✅ Guardado en: " + currentTenantId;
+                    // Limpiar campos
+                    document.getElementById('p_name').value = "";
+                    document.getElementById('p_result').value = "";
+                    // Refrescar búsqueda
+                    buscarPacientes();
+                } else {
+                    throw new Error(data.body || "Error desconocido");
+                }
             } catch (error) {
                 msgDiv.style.background = "#f8d7da";
                 msgDiv.style.color = "#721c24";
@@ -176,7 +216,56 @@
             }
         }
 
-        function logout() { location.reload(); }
+        // 4. BUSCAR PACIENTES (GET)
+        async function buscarPacientes() {
+            const query = document.getElementById('search_q').value;
+            const area = document.getElementById('results-area');
+            
+            area.innerHTML = '<p style="text-align:center; color:#666;">Buscando en esquema seguro...</p>';
+
+            try {
+                // Llamada a la API GET
+                const response = await fetch(`${API_URL}/results?tenant_id=${currentTenantId}&q=${query}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (!data || data.length === 0) {
+                    area.innerHTML = '<p style="text-align:center; padding-top:50px;">No se encontraron resultados.</p>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>ID/Nombre</th><th>Prueba</th><th>Resultado</th><th>Fecha</th></tr></thead><tbody>';
+                
+                data.forEach(item => {
+                    // Intentamos parsear el resultado si viene como string JSON
+                    let resTexto = item.data.result;
+                    try {
+                        if(typeof item.data.result === 'object') resTexto = JSON.stringify(item.data.result);
+                    } catch(e) {}
+
+                    html += `
+                        <tr>
+                            <td style="font-weight:bold;">${item.patient_id}</td>
+                            <td>${item.data.test}</td>
+                            <td style="color:#0066cc;">${resTexto}</td>
+                            <td style="font-size:0.8em; color:#888;">${new Date(item.date).toLocaleDateString()}</td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                area.innerHTML = html;
+
+            } catch (error) {
+                area.innerHTML = `<p style="color:red; text-align:center;">Error al buscar: ${error.message}</p>`;
+            }
+        }
+
+        function logout() {
+            location.reload();
+        }
     </script>
 </body>
 </html>
