@@ -48,7 +48,7 @@ resource "aws_iam_role_policy" "lambda_cognito_policy" {
         "cognito-idp:AdminCreateUser",
         "cognito-idp:AdminSetUserPassword"
       ]
-      Resource = "*" 
+      Resource = "*"
     }]
   })
 }
