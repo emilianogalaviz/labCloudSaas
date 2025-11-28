@@ -16,7 +16,7 @@ resource "aws_lambda_function" "onboarding" {
   timeout          = 15
 
   layers = [
-    
+
     "arn:aws:lambda:us-east-2:770693421113:layer:Klayers-p39-psycopg2-binary:1"
   ]
 
