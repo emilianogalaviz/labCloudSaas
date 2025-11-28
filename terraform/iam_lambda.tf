@@ -32,3 +32,21 @@ resource "aws_iam_role_policy" "lambda_sqs" {
     }]
   })
 }
+
+# Permiso para que la Lambda pueda crear usuarios en Cognito
+resource "aws_iam_role_policy" "lambda_cognito_policy" {
+  name = "labcloud-lambda-cognito-admin"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword"
+      ]
+      Resource = "*" # En prod deberías poner el ARN específico del Pool
+    }]
+  })
+}

@@ -2,146 +2,143 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LabCloud | Portal del Paciente</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    
+    <title>LabCloud - Portal Médico</title>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
-
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding-top: 50px; }
+        .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 400px; text-align: center; }
         
-        <div class="bg-blue-600 p-6 text-center">
-            <div class="mx-auto bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mb-3 backdrop-blur-sm">
-                <i class="fa-solid fa-flask text-2xl text-white"></i>
-            </div>
-            <h1 class="text-2xl font-bold text-white tracking-wide">LabCloud</h1>
-            <p class="text-blue-100 text-sm mt-1">Portal de Resultados Médicos</p>
-        </div>
+        /* Estilos del Login */
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background: #0052a3; }
+        
+        /* Estilos del Dashboard */
+        .dashboard { width: 800px; text-align: left; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 20px; margin-bottom: 20px; }
+        .tenant-badge { background: #e6f3ff; color: #0066cc; padding: 5px 10px; border-radius: 15px; font-size: 14px; font-weight: bold; border: 1px solid #b3d9ff; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; color: #555; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background-color: #f9f9f9; }
+        
+        .status-ok { color: green; font-weight: bold; }
+        .hidden { display: none; }
+        .error { color: red; margin-top: 10px; }
+    </style>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1001.0.min.js"></script>
+    <script src="https://rawgit.com/aws/amazon-cognito-identity-js/master/dist/amazon-cognito-identity.min.js"></script>
+</head>
+<body>
 
-        <div class="p-8">
-            <label class="block text-slate-600 text-sm font-semibold mb-2" for="patientId">
-                Identificación del Paciente
-            </label>
-            
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i class="fa-solid fa-user-injured text-slate-400"></i>
-                </div>
-                <input 
-                    type="text" 
-                    id="patientId" 
-                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-slate-700" 
-                    placeholder="Ej: P-12345"
-                >
-            </div>
-
-            <button 
-                onclick="check()" 
-                id="searchBtn"
-                class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
-            >
-                <span>Consultar Resultados</span>
-                <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
-            </button>
-        </div>
-
-        <div id="resultArea" class="bg-slate-50 border-t border-slate-100 p-6 hidden">
-            </div>
-
+    <div id="login-view" class="container">
+        <h2 style="color:#333;">LabCloud SaaS</h2>
+        <p style="color:#666; margin-bottom: 20px;">Acceso Seguro a Laboratorios</p>
+        <input type="email" id="email" placeholder="Correo (ej: admin@automatas.com)">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button onclick="login()">Ingresar</button>
+        <p id="message" class="error"></p>
     </div>
 
-    <p class="mt-8 text-slate-400 text-xs">
-        &copy; 2025 LabCloud SaaS Platform. Security & Privacy First.
-    </p>
+    <div id="dashboard-view" class="container dashboard hidden">
+        <div class="header">
+            <div>
+                <h2 style="margin:0;">Resultados Médicos</h2>
+                <p style="margin:5px 0 0 0; color:#666;" id="user-display">Usuario...</p>
+            </div>
+            <div style="text-align: right;">
+                <span class="tenant-badge" id="tenant-display">Cargando Tenant...</span>
+                <br>
+                <button onclick="logout()" style="background:none; color:#666; width:auto; padding:5px; margin-top:10px; font-size:12px;">Cerrar Sesión</button>
+            </div>
+        </div>
+
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 6px; border: 1px solid #c8e6c9; margin-bottom: 20px;">
+            <strong>🔒 Conexión Segura:</strong> Estás conectado al esquema aislado de base de datos: <code id="db-schema" style="font-weight:bold;">...</code>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Paciente</th>
+                    <th>Prueba</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Resultado</th>
+                </tr>
+            </thead>
+            <tbody id="patient-table">
+                <tr>
+                    <td>P-1024</td>
+                    <td>Hemograma Completo</td>
+                    <td>2023-11-28</td>
+                    <td class="status-ok">Procesado</td>
+                    <td><a href="#">Ver PDF</a></td>
+                </tr>
+                <tr>
+                    <td>P-1025</td>
+                    <td>Glucosa en Ayunas</td>
+                    <td>2023-11-28</td>
+                    <td class="status-ok">Procesado</td>
+                    <td><a href="#">Ver PDF</a></td>
+                </tr>
+                <tr>
+                    <td>P-1026</td>
+                    <td>Perfil Lipídico</td>
+                    <td>2023-11-27</td>
+                    <td style="color:orange">En Proceso</td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
     <script>
-        async function check() {
-            // --- CONFIGURACIÓN ---
-            const BASE_URL = "https://tsyj9bwol6.execute-api.us-east-2.amazonaws.com"; 
-            // ---------------------
+        // ==========================================
+        // CONFIGURACIÓN
+        // ==========================================
+        const poolData = {
+            UserPoolId: 'us-east-2_MtxCxYovb', 
+            ClientId: '2helbqvf2cl0fitme2sh7t2ugl' 
+        };
 
-            const idInput = document.getElementById('patientId');
-            const btn = document.getElementById('searchBtn');
-            const resultArea = document.getElementById('resultArea');
-            const id = idInput.value.trim();
+        var userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 
-            if (!id) {
-                alert("Por favor ingresa un ID de paciente");
-                return;
-            }
+        function login() {
+            var email = document.getElementById('email').value;
+            var password = document.getElementById('password').value;
+            var authData = { Username: email, Password: password };
+            var authDetails = new AmazonCognitoIdentity.AuthenticationDetails(authData);
+            
+            var userData = { Username: email, Pool: userPool };
+            var cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-            // UI: Estado de Carga
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Buscando...';
-            resultArea.classList.add('hidden');
+            document.getElementById('message').innerText = "Autenticando...";
 
-            try {
-                // Simulación de llamada (Descomenta la siguiente línea cuando tengas la URL real)
-                const response = await fetch(`${BASE_URL}/ingest`, { method: 'POST', body: JSON.stringify({ patient_id: id }) });
+            cognitoUser.authenticateUser(authDetails, {
+                onSuccess: function(result) {
+                    var payload = result.getIdToken().payload;
+                    var tenantId = payload['custom:tenant_id'];
+                    var email = payload['email'];
+                    mostrarDashboard(email, tenantId);
+                },
+                onFailure: function(err) {
+                    document.getElementById('message').innerText = "Error: " + (err.message || JSON.stringify(err));
+                },
+            });
+        }
 
-                // Renderizar Éxito
-                resultArea.innerHTML = `
-                    <div class="fade-in">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-sm font-bold text-slate-500 uppercase">Resultado del Análisis</h3>
-                            <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full border border-green-200">
-                                <i class="fa-solid fa-check mr-1"></i> Disponible
-                            </span>
-                        </div>
-                        
-                        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                            <div class="flex items-start gap-3">
-                                <div class="bg-blue-50 p-2 rounded-md">
-                                    <i class="fa-solid fa-file-medical text-blue-600 text-xl"></i>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-slate-400">ID Paciente</p>
-                                    <p class="font-bold text-slate-700 text-lg">${mockData.patient}</p>
-                                    
-                                    <div class="mt-3 flex gap-4">
-                                        <div>
-                                            <p class="text-xs text-slate-400">Fecha</p>
-                                            <p class="text-sm font-medium text-slate-600">${mockData.date}</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-slate-400">Resultado</p>
-                                            <p class="text-sm font-bold text-slate-800">${mockData.result}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <button class="w-full mt-4 bg-white border border-slate-300 text-slate-600 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                            <i class="fa-solid fa-download mr-1"></i> Descargar PDF
-                        </button>
-                    </div>
-                `;
-                resultArea.classList.remove('hidden');
+        function mostrarDashboard(email, tenantId) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.remove('hidden');
+            
+            document.getElementById('user-display').innerText = email;
+            document.getElementById('tenant-display').innerText = "Tenant: " + tenantId;
+            document.getElementById('db-schema').innerText = tenantId;
+        }
 
-            } catch (error) {
-                console.error(error);
-                resultArea.innerHTML = `
-                    <div class="text-center text-red-500 fade-in p-2">
-                        <i class="fa-solid fa-circle-exclamation text-2xl mb-2"></i>
-                        <p class="font-medium">Error al consultar</p>
-                        <p class="text-xs text-red-400">Intenta nuevamente</p>
-                    </div>
-                `;
-                resultArea.classList.remove('hidden');
-            } finally {
-                // UI: Restaurar Botón
-                btn.disabled = false;
-                btn.innerHTML = '<span>Consultar Resultados</span><i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>';
-            }
+        function logout() {
+            location.reload();
         }
     </script>
 </body>
