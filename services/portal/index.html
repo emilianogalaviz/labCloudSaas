@@ -2,144 +2,181 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>LabCloud - Portal Médico</title>
+    <title>LabCloud SaaS - Gestión de Laboratorios</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding-top: 50px; }
-        .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 400px; text-align: center; }
-        
-        /* Estilos del Login */
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        button:hover { background: #0052a3; }
-        
-        /* Estilos del Dashboard */
-        .dashboard { width: 800px; text-align: left; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 20px; margin-bottom: 20px; }
-        .tenant-badge { background: #e6f3ff; color: #0066cc; padding: 5px 10px; border-radius: 15px; font-size: 14px; font-weight: bold; border: 1px solid #b3d9ff; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; color: #555; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        tr:hover { background-color: #f9f9f9; }
-        
-        .status-ok { color: green; font-weight: bold; }
-        .hidden { display: none; }
-        .error { color: red; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; }
+        .login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+        input, select, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #0066cc; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #0052a3; }
+        .dashboard-container { max-width: 1000px; margin: 0 auto; padding: 20px; display: none; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 30px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .lab-badge { background: #e3f2fd; color: #0d47a1; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; border: 1px solid #bbdefb; }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .panel { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #333; }
+        label { display: block; text-align: left; font-weight: bold; margin-top: 10px; color: #555; }
+        .success-msg { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; display: none; margin-top: 10px; }
     </style>
-    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1001.0.min.js"></script>
-    <script src="https://rawgit.com/aws/amazon-cognito-identity-js/master/dist/amazon-cognito-identity.min.js"></script>
-</head>
+
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1363.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.3/dist/amazon-cognito-identity.min.js"></script>
+    </head>
 <body>
 
-    <div id="login-view" class="container">
-        <h2 style="color:#333;">LabCloud SaaS</h2>
-        <p style="color:#666; margin-bottom: 20px;">Acceso Seguro a Laboratorios</p>
-        <input type="email" id="email" placeholder="Correo (ej: admin@automatas.com)">
-        <input type="password" id="password" placeholder="Contraseña">
-        <button onclick="login()">Ingresar</button>
-        <p id="message" class="error"></p>
+    <div id="login-view" class="login-container">
+        <div class="card">
+            <h2 style="color:#0066cc;">LabCloud SaaS</h2>
+            <p style="color:#666;">Plataforma Multi-Tenant</p>
+            <input type="email" id="email" placeholder="Correo Administrativo">
+            <input type="password" id="password" placeholder="Contraseña">
+            <button onclick="login()">Ingresar al Tenant</button>
+            <p id="login-error" class="error-msg" style="display:none;"></p>
+        </div>
     </div>
 
-    <div id="dashboard-view" class="container dashboard hidden">
-        <div class="header">
+    <div id="dashboard-view" class="dashboard-container">
+        <div class="navbar">
             <div>
-                <h2 style="margin:0;">Resultados Médicos</h2>
-                <p style="margin:5px 0 0 0; color:#666;" id="user-display">Usuario...</p>
+                <h3 style="margin:0;">Panel de Administración</h3>
+                <small id="user-email-display" style="color:#666;">...</small>
             </div>
             <div style="text-align: right;">
-                <span class="tenant-badge" id="tenant-display">Cargando Tenant...</span>
-                <br>
-                <button onclick="logout()" style="background:none; color:#666; width:auto; padding:5px; margin-top:10px; font-size:12px;">Cerrar Sesión</button>
+                <div class="lab-badge" id="tenant-badge">Cargando Tenant...</div>
+                <a href="#" onclick="logout()" style="font-size:0.8em; color:red; text-decoration:none; margin-top:5px; display:block;">Cerrar Sesión</a>
             </div>
         </div>
 
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 6px; border: 1px solid #c8e6c9; margin-bottom: 20px;">
-            <strong>🔒 Conexión Segura:</strong> Estás conectado al esquema aislado de base de datos: <code id="db-schema" style="font-weight:bold;">...</code>
+        <div class="grid">
+            <div class="panel">
+                <h3>Registrar Paciente</h3>
+                <p style="font-size:0.9em; color:#666;">Los datos se guardarán en tu esquema aislado.</p>
+                <label>Nombre del Paciente:</label>
+                <input type="text" id="p_name" placeholder="Ej: Juan Pérez">
+                <label>Tipo de Prueba:</label>
+                <select id="p_test">
+                    <option value="Sanguínea">Análisis Sanguíneo</option>
+                    <option value="COVID-19">Prueba COVID-19</option>
+                    <option value="Orina">General de Orina</option>
+                </select>
+                <label>Resultados (JSON/Texto):</label>
+                <textarea id="p_result" rows="3" placeholder='{"glucosa": 95}'></textarea>
+                <button onclick="registrarPaciente()" style="margin-top:15px;">Guardar en Base de Datos</button>
+                <div id="api-msg" class="success-msg"></div>
+            </div>
+            <div class="panel">
+                <h3>Buscar en Base de Datos</h3>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" placeholder="ID o Nombre..." style="margin:0;">
+                    <button style="width:auto;">Buscar</button>
+                </div>
+                <br>
+                <div style="background:#f9f9f9; padding:15px; border-radius:5px; border:1px dashed #ccc; height:200px; color:#888; display:flex; align-items:center; justify-content:center;">
+                    Resultados del esquema <b id="schema-display" style="margin-left:5px;">...</b> aparecerán aquí.
+                </div>
+            </div>
         </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Paciente</th>
-                    <th>Prueba</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Resultado</th>
-                </tr>
-            </thead>
-            <tbody id="patient-table">
-                <tr>
-                    <td>P-1024</td>
-                    <td>Hemograma Completo</td>
-                    <td>2023-11-28</td>
-                    <td class="status-ok">Procesado</td>
-                    <td><a href="#">Ver PDF</a></td>
-                </tr>
-                <tr>
-                    <td>P-1025</td>
-                    <td>Glucosa en Ayunas</td>
-                    <td>2023-11-28</td>
-                    <td class="status-ok">Procesado</td>
-                    <td><a href="#">Ver PDF</a></td>
-                </tr>
-                <tr>
-                    <td>P-1026</td>
-                    <td>Perfil Lipídico</td>
-                    <td>2023-11-27</td>
-                    <td style="color:orange">En Proceso</td>
-                    <td>-</td>
-                </tr>
-            </tbody>
-        </table>
     </div>
 
     <script>
         // ==========================================
-        // CONFIGURACIÓN
+        // ⚠️ PEGA TUS DATOS AQUÍ OTRA VEZ
         // ==========================================
-        const poolData = {
+        const API_URL = "https://msu80ions6.execute-api.us-east-2.amazonaws.com"; 
+        const POOL_DATA = {
             UserPoolId: 'us-east-2_MtxCxYovb', 
             ClientId: '2helbqvf2cl0fitme2sh7t2ugl' 
         };
 
-        var userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+        var userPool = new AmazonCognitoIdentity.CognitoUserPool(POOL_DATA);
+        var currentTenantId = null;
 
         function login() {
             var email = document.getElementById('email').value;
             var password = document.getElementById('password').value;
+            
             var authData = { Username: email, Password: password };
             var authDetails = new AmazonCognitoIdentity.AuthenticationDetails(authData);
-            
             var userData = { Username: email, Pool: userPool };
             var cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-            document.getElementById('message').innerText = "Autenticando...";
+            document.getElementById('login-error').style.display = 'none';
 
             cognitoUser.authenticateUser(authDetails, {
                 onSuccess: function(result) {
                     var payload = result.getIdToken().payload;
-                    var tenantId = payload['custom:tenant_id'];
-                    var email = payload['email'];
-                    mostrarDashboard(email, tenantId);
+                    currentTenantId = payload['custom:tenant_id'];
+                    var emailUser = payload['email'];
+                    
+                    if(!currentTenantId) {
+                        alert("Error: Usuario sin Tenant ID.");
+                        return;
+                    }
+                    loadDashboard(emailUser, currentTenantId);
                 },
                 onFailure: function(err) {
-                    document.getElementById('message').innerText = "Error: " + (err.message || JSON.stringify(err));
+                    var errorDiv = document.getElementById('login-error');
+                    errorDiv.innerText = err.message || JSON.stringify(err);
+                    errorDiv.style.display = 'block';
                 },
+                newPasswordRequired: function(userAttributes, requiredAttributes) {
+                    // Cognito a veces pide cambio de contraseña al primer login
+                    // Para esta demo, lo forzamos con la misma contraseña (truco rápido)
+                    cognitoUser.completeNewPasswordChallenge(password, {}, {
+                        onSuccess: function(result) { login(); },
+                        onFailure: function(err) { alert("Error pass: " + err.message); }
+                    });
+                }
             });
         }
 
-        function mostrarDashboard(email, tenantId) {
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('dashboard-view').classList.remove('hidden');
-            
-            document.getElementById('user-display').innerText = email;
-            document.getElementById('tenant-display').innerText = "Tenant: " + tenantId;
-            document.getElementById('db-schema').innerText = tenantId;
+        function loadDashboard(email, tenantId) {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('dashboard-view').style.display = 'block';
+            document.getElementById('user-email-display').innerText = email;
+            document.getElementById('tenant-badge').innerText = "🏢 " + tenantId.toUpperCase();
+            document.getElementById('schema-display').innerText = tenantId;
         }
 
-        function logout() {
-            location.reload();
+        async function registrarPaciente() {
+            const name = document.getElementById('p_name').value;
+            const test = document.getElementById('p_test').value;
+            const result = document.getElementById('p_result').value;
+            const msgDiv = document.getElementById('api-msg');
+
+            msgDiv.style.display = 'block';
+            msgDiv.style.background = "#e2e6ea";
+            msgDiv.style.color = "#333";
+            msgDiv.innerText = "Enviando...";
+
+            try {
+                const response = await fetch(`${API_URL}/ingest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: currentTenantId,
+                        patient_name: name,
+                        test_type: test,
+                        result_data: result,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    msgDiv.style.background = "#d4edda";
+                    msgDiv.style.color = "#155724";
+                    msgDiv.innerText = "✅ Guardado en esquema: " + currentTenantId;
+                } else { throw new Error(data.body); }
+            } catch (error) {
+                msgDiv.style.background = "#f8d7da";
+                msgDiv.style.color = "#721c24";
+                msgDiv.innerText = "Error: " + error.message;
+            }
         }
+
+        function logout() { location.reload(); }
     </script>
 </body>
 </html>
