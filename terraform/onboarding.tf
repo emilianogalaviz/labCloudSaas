@@ -16,7 +16,7 @@ resource "aws_lambda_function" "onboarding" {
   timeout          = 15
 
   layers = [
-    # ARN de la librería psycopg2 precompilada para us-east-2 (Python 3.9)
+    
     "arn:aws:lambda:us-east-2:770693421113:layer:Klayers-p39-psycopg2-binary:1"
   ]
 
