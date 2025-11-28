@@ -1,11 +1,10 @@
-# FORCE UPDATE: VERSION FINAL CON PROTECCION NULL
 import json
 import boto3
 import os
 import psycopg2
 from datetime import datetime
 
-# AWS Resources
+# Recursos AWS
 sqs = boto3.client('sqs')
 dynamodb = boto3.resource('dynamodb')
 
@@ -25,50 +24,44 @@ def search_results(tenant_id, search_term):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
+            # 1. Aislamiento: Entrar al esquema del cliente
             cur.execute(f"SET search_path TO {tenant_id};")
             
-            # --- FIX: NO SELECCIONAMOS patient_id PORQUE NO EXISTE ---
-            # Seleccionamos solo 'data' y 'created_at'. 
-            # El ID del paciente está DENTRO del JSON 'data'.
-            
+            # 2. Búsqueda Optimizada
+            # Ahora usamos la columna 'patient_id' real que creamos en el fix
             if search_term:
-                # Buscamos dentro del texto del JSON (data) porque no hay columna patient_id
-                query = "SELECT data, created_at FROM results WHERE data::text LIKE %s LIMIT 10;"
+                query = "SELECT patient_id, data, created_at FROM results WHERE patient_id LIKE %s LIMIT 10;"
                 cur.execute(query, (f'%{search_term}%',))
             else:
-                query = "SELECT data, created_at FROM results ORDER BY created_at DESC LIMIT 10;"
+                query = "SELECT patient_id, data, created_at FROM results ORDER BY created_at DESC LIMIT 10;"
                 cur.execute(query)
             
             rows = cur.fetchall()
             results = []
             
             for row in rows:
-                # row[0] = data (JSON string), row[1] = created_at
-                raw_data = row[0]
-                created_at = str(row[1])
+                # row[0]=patient_id, row[1]=data (json string), row[2]=fecha
+                p_id = row[0]
+                raw_data = row[1]
+                created_at = str(row[2])
                 
-                patient_name = "Desconocido"
-                display_data = {}
-
+                # Parsear el JSON de detalles
+                details = {}
                 if raw_data:
                     try:
-                        parsed = json.loads(raw_data)
-                        # Intentamos sacar el nombre de varios lugares posibles del JSON
-                        patient_name = parsed.get('patient_name') or parsed.get('patient_id') or "Anónimo"
-                        display_data = parsed
+                        details = json.loads(raw_data)
                     except:
-                        display_data = {"error": "Datos corruptos"}
-                
+                        details = {"info": "Datos no legibles"}
+
                 results.append({
-                    "patient_id": patient_name, # Mostramos el nombre extraído del JSON
-                    "data": display_data,
+                    "patient_id": p_id, 
+                    "data": details,
                     "date": created_at
                 })
             return results
 
     except Exception as e:
         print(f"Error DB: {str(e)}")
-        # Devolvemos error vacío para no romper el frontend
         return []
     finally:
         if conn: conn.close()
@@ -87,27 +80,45 @@ def handler(event, context):
     try:
         http_method = event.get('requestContext', {}).get('http', {}).get('method')
         
-        # GET (BUSCAR)
+        # --- GET (BUSCAR) ---
         if http_method == 'GET':
             params = event.get('queryStringParameters', {})
             tenant_id = params.get('tenant_id')
             query = params.get('q', '')
+            
             if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
             
             data = search_results(tenant_id, query)
-            return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps(data)}
+            
+            return {
+                "statusCode": 200, 
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                }, 
+                "body": json.dumps(data)
+            }
 
-        # POST (GUARDAR)
+        # --- POST (GUARDAR) ---
         if 'body' in event: body = json.loads(event['body'])
         else: body = event
         
         tenant_id = body.get('tenant_id')
         if not tenant_id: return {"statusCode": 400, "body": "Falta tenant_id"}
         
+        # 1. Cobrar
         record_usage(tenant_id)
+        # 2. Enviar a SQS
         sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(body))
         
-        return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps({"message": "Enviado"})}
+        return {
+            "statusCode": 200, 
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            }, 
+            "body": json.dumps({"message": "Enviado"})
+        }
 
     except Exception as e:
         return {"statusCode": 500, "body": str(e)}
