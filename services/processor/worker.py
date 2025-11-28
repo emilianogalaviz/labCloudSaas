@@ -2,7 +2,6 @@ import os
 import json
 import time
 import psycopg2
-from psycopg2 import sql
 import boto3
 
 DB_HOST = os.environ.get('DB_HOST')
@@ -17,52 +16,6 @@ sqs = boto3.client('sqs', region_name=REGION)
 def get_db_connection():
     return psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
 
-
-def ensure_tenant_schema(cur, tenant_id):
-    """Crea el esquema del tenant (si no existe) y lo selecciona de forma segura."""
-
-    # Crear el esquema sin riesgo de inyección
-    cur.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {schema};").format(schema=sql.Identifier(tenant_id)))
-
-    # Fijar el search_path del tenant y conservar public como fallback
-    cur.execute(
-        sql.SQL("SET search_path TO {schema}, public;").format(schema=sql.Identifier(tenant_id))
-    )
-
-def ensure_results_table(cur):
-    """Garantiza que la tabla results tenga la columna patient_id.
-
-    Algunos clientes antiguos fueron creados antes de agregar el campo
-    patient_id, lo que provoca errores al insertar. Este bloque crea la
-    tabla si falta y agrega la columna cuando no existe.
-    """
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS results (
-            id SERIAL PRIMARY KEY,
-            patient_id VARCHAR(100),
-            data TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """
-    )
-
-    cur.execute(
-        """
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_schema = current_schema()
-                  AND table_name = 'results'
-                  AND column_name = 'patient_id'
-            ) THEN
-                ALTER TABLE results ADD COLUMN patient_id VARCHAR(100);
-            END IF;
-        END $$;
-        """
-    )
-
 def save_result(data):
     tenant_id = data.get('tenant_id')
     patient = data.get('patient_name') or 'Desconocido'
@@ -74,11 +27,8 @@ def save_result(data):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            ensure_tenant_schema(cur, tenant_id)
-
-            # Aseguramos que la tabla tenga la columna patient_id
-            ensure_results_table(cur)
-
+            cur.execute(f"SET search_path TO {tenant_id};")
+            
             # Insertamos explícitamente en patient_id
             sql = """
                 INSERT INTO results (patient_id, data, created_at)
