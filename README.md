@@ -133,4 +133,3 @@ Esta arquitectura está optimizada para bajo costo utilizando servicios comparti
 
 ---
 
-Si quieres, también te lo puedo generar como archivo **.md listo para descargar**.
