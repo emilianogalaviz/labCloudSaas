@@ -1,7 +1,3 @@
-Aquí está **todo el contenido convertido a un archivo `.md`**, sin los fences de código y totalmente listo para copiar/pegar en tu archivo Markdown:
-
----
-
 # ☁️ LabCloud - SaaS Multi-Tenant para Laboratorios Clínicos
 
 ![AWS](https://img.shields.io/badge/AWS-100000?style=for-the-badge\&logo=amazon\&logoColor=white)
